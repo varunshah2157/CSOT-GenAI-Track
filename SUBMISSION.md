@@ -19,7 +19,7 @@ This repository contains the foundational components for a multi-turn LLM agent,
 ## Build Features
 
 ### Build 1: Single-Turn Architecture
-- **Pre-Flight Endpoint Verification:** Implemented a fast `max_tokens=1` ping loop to verify model availability before attempting the primary generation.
+- **Pre-Flight Endpoint Verification:** Implemented a ping loop to verify model availability before attempting the primary generation.
 - **Real-Time Streaming:** Utilized `stream=True` and I/O buffer flushing (`flush=True`) to deliver tokens to the console instantaneously.
 - **Metadata Extraction:** Leveraged `stream_options={"include_usage": True}` to capture and display precise token metrics (Prompt, Completion, Total) from the final chunk of the stream.
 
