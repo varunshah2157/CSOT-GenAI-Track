@@ -23,7 +23,7 @@ This repository contains the foundational components for a multi-turn LLM agent,
 - **Real-Time Streaming:** Utilized `stream=True` and I/O buffer flushing (`flush=True`) to deliver tokens to the console instantaneously.
 - **Metadata Extraction:** Leveraged `stream_options={"include_usage": True}` to capture and display precise token metrics (Prompt, Completion, Total) from the final chunk of the stream.
 
-### Build 2: Multi-Turn Memory & Compaction
+### Build 2: Multi-Turn Memory & Compaction (FINAL SUBMISSION)
 - **Context Preservation:** Successfully engineered a loop that appends and sends the full conversational history on every interaction.
 - **Dynamic Compaction:** Implemented a rolling buffer safeguard. When the conversation exceeds the `MAX_TURNS` threshold, a background API call automatically summarizes the middle turns into a condensed context block to prevent token overflow while preserving the system prompt and recent history.
 - **Interactive CLI Commands:**
