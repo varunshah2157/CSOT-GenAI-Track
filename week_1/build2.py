@@ -37,7 +37,7 @@ def run_chatbot():
     messages = [system_prompt]
     MAX_TURNS = 10
     last_usage = None
-    print("Chat started. Type 'exit' or 'quit' to quit.")
+    print("Chat started. Type 'exit' to quit.")
     print("Commands: /reset (clear history), /compact (force condense history), /tokens (show usage)\n")
     while True:
         if len(messages) > MAX_TURNS:
@@ -70,7 +70,7 @@ def run_chatbot():
         if not user_input:
             continue
         lower_input = user_input.lower()
-        if lower_input in ["exit", "quit"]:
+        if lower_input == 'exit':
             print("Goodbye!")
             break
         elif lower_input == "/reset":
