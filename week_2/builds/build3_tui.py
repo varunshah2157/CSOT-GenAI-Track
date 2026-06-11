@@ -38,12 +38,38 @@ client = OpenAI(
     api_key=os.environ["OPENROUTER_API_KEY"],
 )
 
-MODEL = "deepseek/deepseek-v4-flash:free"
+
+def get_active_model() -> str:
+    priority_models = [
+        "deepseek/deepseek-v4-flash:free",
+        "google/gemini-2.0-flash-exp:free",
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "mistralai/mistral-7b-instruct:free",
+        "openai/gpt-oss-20b:free",
+        "openrouter/free"
+    ]
+    print("Checking for an available model endpoint...")
+    for name in priority_models:
+        try:
+            client.chat.completions.create(
+                model=name,
+                messages=[{"role": "user", "content": "ping"}],
+            )
+            print(f"Connected successfully to: {name}\n")
+            return name
+        except Exception:
+            pass
+    raise RuntimeError(
+        "Critical Error: All priority models failed to respond.")
+
+
+MODEL = get_active_model()
 MAX_HISTORY_TURNS = 20   # keep last N user+assistant pairs
 
 # ---------------------------------------------------------------------------
 # Chat logic (reuse / adapt from your Week 1 submission)
 # ---------------------------------------------------------------------------
+
 
 def call_model(messages: list[dict]) -> str:
     """
@@ -51,7 +77,11 @@ def call_model(messages: list[dict]) -> str:
     This is a blocking call. It must run in a worker thread in the TUI.
     """
     # TODO: implement using client.chat.completions.create()
-    pass
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=messages,
+    )
+    return response.choices[0].message.content
 
 
 def trim_history(messages: list[dict], max_turns: int) -> list[dict]:
@@ -63,7 +93,14 @@ def trim_history(messages: list[dict], max_turns: int) -> list[dict]:
     A 'pair' is one user message + one assistant message = 2 entries.
     """
     # TODO: implement
-    pass
+    if len(messages) <= 1:
+        return messages
+    system_message = messages[0]
+    chat_history = messages[1:]
+    max_elements = max_turns * 2
+    if len(chat_history) > max_elements:
+        chat_history = chat_history[-max_elements:]
+    return [system_message] + chat_history
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +148,8 @@ class ChatApp(App):
 
     def on_mount(self) -> None:
         log = self.query_one("#log", RichLog)
-        log.write("[bold green]Chat started.[/bold green] Ctrl+Q to quit, Ctrl+L to clear.\n")
+        log.write(
+            "[bold green]Chat started.[/bold green] Ctrl+Q to quit, Ctrl+L to clear.\n")
         self.query_one(Input).focus()
 
     # -----------------------------------------------------------------------
@@ -134,8 +172,7 @@ class ChatApp(App):
         self.messages = trim_history(self.messages, MAX_HISTORY_TURNS)
 
         # Run the API call in a background thread so the UI stays responsive
-        # TODO: call self.run_worker(self._get_response(), thread=True)
-        pass
+        self.run_worker(self._get_response(), thread=True)
 
     async def _get_response(self) -> None:
         """
@@ -150,8 +187,14 @@ class ChatApp(App):
         Handle exceptions: if call_model raises, display an error in the log.
         """
         log = self.query_one("#log", RichLog)
-        # TODO: implement
-        pass
+        try:
+            reply = call_model(self.messages)
+            self.messages.append({"role": "assistant", "content": reply})
+            self.call_from_thread(
+                log.write, f"[bold green][Agent][/bold green] {reply}\n")
+        except Exception as e:
+            self.call_from_thread(
+                log.write, f"[bold red][Error][/bold red] Failed to fetch response: {e}\n")
 
     # -----------------------------------------------------------------------
     # Actions (bound to keyboard shortcuts)
@@ -159,15 +202,16 @@ class ChatApp(App):
 
     def action_clear_display(self) -> None:
         """Clear the visible log without touching conversation history."""
-        # TODO: implement
-        pass
+        self.query_one("#log", RichLog).clear()
 
     def action_clear_history(self) -> None:
         """Reset conversation history and clear the display."""
-        # TODO: reset self.messages to just the system message
-        # TODO: clear the display
-        # TODO: write a "History cleared." notice to the log
-        pass
+        self.messages = [
+            {"role": "system", "content": "You are a helpful assistant."}
+        ]
+        log = self.query_one("#log", RichLog)
+        log.clear()
+        log.write("[bold yellow]History cleared.[/bold yellow]\n")
 
 
 # ---------------------------------------------------------------------------

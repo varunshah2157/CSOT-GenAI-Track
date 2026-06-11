@@ -1,0 +1,36 @@
+{
+  "tokens": {
+    "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6Imluc18yeTlMdjJRQlYwOWlvZzlpYXpzZEcwdHduUGIiLCJ0eXAiOiJhdCtqd3QifQ.eyJjbGllbnRfaWQiOiJ6SWptdzZQZ2FiTnRaMW9MIiwiZXhwIjoxNzgxMjg5MTM4LCJpYXQiOjE3ODEyMDI3MzgsImlzcyI6Imh0dHBzOi8vY2xlcmsuYWxwaGF4aXYub3JnIiwianRpIjoib2F0XzM4Q0FBTVcxVEdNSDNYWEQiLCJuYmYiOjE3ODEyMDI3MjgsInNjb3BlIjoiZW1haWwgcHJvZmlsZSBvZmZsaW5lX2FjY2VzcyIsInN1YiI6InVzZXJfM0YwOVNxUER5aWg0djVqcDdjZzkwc1JkOWpUIn0.N3L-3eZmh622KpaiBF1YcVO0r4aJymNl2JPqUVPM1abWoAWYYBJ4EOu9igjad8cIHM5RZP4tYfNaxvsfC-B7LSbl_Q8r6DDmpKhz3oNQTafXhxqAni9ppAiCX_ORh6YsLZr7SWIdSyBAqOPpc8ISv37sL9cG3AyV_q5vJKGSKytEevIKVFKCzCj5zSK5MOJ9AgAhEDW3Q2xhJZym-bSv2_MdBGoUmaipbzh3YunDi_Sho-cgbBppAoWdZJBQmUtT56KzOyl0TjU_YQaNWi5LZi6Y5KzkV33mFjas928ImyzGf_ZOxH6kzGnf3W3jgupCO-j2CyZqMC0TLWWjmpMvJA",
+    "token_type": "Bearer",
+    "expires_in": 86399,
+    "scope": "email profile offline_access",
+    "refresh_token": "MWEZOTK3ODGTOTI1ZI01NTFHLTGWN2UTNDUZNJU5OWUWN2JK"
+  },
+  "client_info": {
+    "redirect_uris": [
+      "http://localhost:8765/callback"
+    ],
+    "token_endpoint_auth_method": "client_secret_basic",
+    "grant_types": [
+      "authorization_code"
+    ],
+    "response_types": [
+      "code"
+    ],
+    "scope": "email offline_access profile",
+    "client_name": "ResearchBot TUI",
+    "client_uri": null,
+    "logo_uri": null,
+    "contacts": null,
+    "tos_uri": null,
+    "policy_uri": null,
+    "jwks_uri": null,
+    "jwks": null,
+    "software_id": null,
+    "software_version": null,
+    "client_id": "zIjmw6PgabNtZ1oL",
+    "client_secret": "WlgG7CPx0eWcBr2ryzk8t9913HpVKQVI",
+    "client_id_issued_at": 1781202722557,
+    "client_secret_expires_at": 0
+  }
+}

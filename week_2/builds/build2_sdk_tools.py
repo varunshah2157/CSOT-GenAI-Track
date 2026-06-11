@@ -25,6 +25,7 @@ import os
 import json
 from openai import OpenAI
 from dotenv import load_dotenv
+import sys
 
 load_dotenv()
 
@@ -33,11 +34,34 @@ client = OpenAI(
     api_key=os.environ["OPENROUTER_API_KEY"],
 )
 
-MODEL = "deepseek/deepseek-v4-flash:free"
+
+def get_active_model() -> str:
+    priority_models = [
+        "deepseek/deepseek-v4-flash:free",
+        "google/gemini-2.0-flash-exp:free",
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "mistralai/mistral-7b-instruct:free",
+        "openai/gpt-oss-20b:free",
+        "openrouter/free"
+    ]
+    print("Checking for an available model endpoint...")
+    for name in priority_models:
+        try:
+            client.chat.completions.create(
+                model=name,
+                messages=[{"role": "user", "content": "ping"}],
+            )
+            print(f"Connected successfully to: {name}\n")
+            return name
+        except Exception:
+            pass
+    raise RuntimeError(
+        "Critical Error: All priority models failed to respond.")
 
 # ---------------------------------------------------------------------------
 # Tool schemas (the contract between you and the model)
 # ---------------------------------------------------------------------------
+
 
 TOOLS = [
     {
@@ -93,6 +117,7 @@ TOOLS = [
 # Tool implementations
 # ---------------------------------------------------------------------------
 
+
 def get_weather(city: str, unit: str = "celsius") -> dict:
     """
     Return realistic-looking fake weather data for the city.
@@ -101,8 +126,25 @@ def get_weather(city: str, unit: str = "celsius") -> dict:
     Return a dict like:
         {"city": city, "temperature": 28, "unit": unit, "condition": "partly cloudy"}
     """
-    # TODO: implement (hardcode some reasonable values)
-    pass
+    city_lower = city.lower()
+    if "tokyo" in city_lower:
+        temp = 14 if unit == "celsius" else 57
+        condition = "Rainy"
+    elif "delhi" in city_lower:
+        temp = 34 if unit == "celsius" else 93
+        condition = "Sunny"
+    elif "london" in city_lower:
+        temp = 11 if unit == "celsius" else 52
+        condition = "Overcast"
+    else:
+        temp = 21 if unit == "celsius" else 70
+        condition = "Partly Cloudy"
+    return {
+        "city": city,
+        "temperature": temp,
+        "unit": unit,
+        "condition": condition
+    }
 
 
 def calculate(expression: str) -> dict:
@@ -111,8 +153,13 @@ def calculate(expression: str) -> dict:
     Use eval() with restricted globals so imports and builtins are blocked.
     Return {"result": value} or {"error": message}.
     """
-    # TODO: implement
-    pass
+    try:
+        allowed_globals = {"__builtins__": None}
+        allowed_locals = {}
+        result = eval(expression, allowed_globals, allowed_locals)
+        return {"result": result}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)}"}
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +170,7 @@ TOOL_REGISTRY = {
     "get_weather": get_weather,
     "calculate": calculate,
 }
+
 
 def dispatch(tool_call) -> str:
     """
@@ -137,8 +185,20 @@ def dispatch(tool_call) -> str:
 
     Note: tool_call.function.arguments is a *string*, not a dict. Parse it first.
     """
-    # TODO: implement
-    pass
+    name = tool_call.function.name
+    arguments_str = tool_call.function.arguments
+    try:
+        args = json.loads(arguments_str)
+    except Exception as e:
+        return json.dumps({"error": f"Failed to parse arguments JSON: {str(e)}"})
+    if name not in TOOL_REGISTRY:
+        return json.dumps({"error": f"Unknown tool: {name}"})
+    try:
+        func = TOOL_REGISTRY[name]
+        result_dict = func(**args)
+        return json.dumps(result_dict)
+    except Exception as e:
+        return json.dumps({"error": f"Execution error in tool '{name}': {str(e)}"})
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +206,7 @@ def dispatch(tool_call) -> str:
 # ---------------------------------------------------------------------------
 
 MAX_ITERATIONS = 8
+
 
 def run_agent(user_message: str) -> str:
     """
@@ -179,13 +240,32 @@ def run_agent(user_message: str) -> str:
             messages=messages,
             tools=TOOLS,
         )
+        if getattr(response, 'choices', None) is None:
+            print(
+                f"\n[API Error] Invalid response from OpenRouter: {response}", file=sys.stderr)
+            return "Error: The model provider returned an invalid response (likely a rate limit or timeout)."
+
         message = response.choices[0].message
         finish_reason = response.choices[0].finish_reason
 
-        # TODO: handle finish_reason == "tool_calls"
-        # TODO: handle finish_reason == "stop"
-        pass
-
+        if finish_reason == "tool_calls":
+            messages.append(message.model_dump(exclude_none=True))
+            if message.tool_calls:
+                for tool_call in message.tool_calls:
+                    print(
+                        f"[Tool Call] Executing '{tool_call.function.name}' with args: {tool_call.function.arguments}",
+                        file=sys.stderr
+                    )
+                    result_str = dispatch(tool_call)
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": tool_call.function.name,
+                        "content": result_str,
+                    })
+            continue
+        elif finish_reason == "stop":
+            return message.content
     return f"[Agent stopped after {MAX_ITERATIONS} iterations without a final answer]"
 
 
@@ -199,6 +279,8 @@ if __name__ == "__main__":
         "Calculate: (2**10) - 1",
         "Compare the weather in London and Delhi, and tell me what 451 * 3 is.",
     ]
+
+    MODEL = get_active_model()
 
     for query in test_queries:
         print(f"\n{'='*60}")
