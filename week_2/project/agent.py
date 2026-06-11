@@ -1,8 +1,16 @@
 """
-Build 3: Terminal Perplexity - The Research Agent TUI
-=====================================================
-A full-screen terminal UI using Textual, chaining web search, 
-page fetching, and academic paper search (AlphaXiv MCP).
+ResearchBot: Week 2 Project Starter
+======================================
+This file currently makes a basic single-turn call to OpenRouter.
+Your job is to evolve it into a full research agent with:
+  - Web search and web fetch tools (using OpenAI SDK tool calling)
+  - An agent loop that iterates until the model stops requesting tools
+  - A Textual TUI with a chat panel and a tool activity log
+  - Keyboard shortcuts: Ctrl+L (clear display), Ctrl+K (clear history), Ctrl+Q (quit),
+    and at least one more of your choice
+
+Start by getting this file working, then add tools, then add the TUI.
+Don't try to build everything at once.
 """
 
 import os
@@ -124,10 +132,8 @@ def save_research_note(filename: str, content: str) -> str:
     """Save findings to a markdown file in a notes/ directory."""
     try:
         os.makedirs("notes", exist_ok=True)
-        # Force a .md extension if the model forgets
         if not filename.endswith(".md"):
             filename += ".md"
-
         filepath = os.path.join("notes", filename)
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(content)
@@ -238,26 +244,21 @@ async def wait_for_callback() -> tuple[str, str | None]:
         request = (await reader.read(1024)).decode()
         first_line = request.split('\n')[0]
         path = first_line.split(' ')[1]
-
         query_string = urlparse(path).query
         params = {k: v for k, v in [item.split(
             '=') for item in query_string.split('&') if '=' in item]}
-
         code = params.get("code")
         state = params.get("state")
-
         response = b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n<h1>Authorized. You can close this tab.</h1>"
         writer.write(response)
         await writer.drain()
         writer.close()
         await writer.wait_closed()
         stop_event.set()
-
     server = await asyncio.start_server(handle_client, 'localhost', 8765)
     await stop_event.wait()
     server.close()
     await server.wait_closed()
-
     if not code:
         raise RuntimeError("OAuth callback received no authorization code.")
     return code, state
@@ -303,7 +304,6 @@ class ResearchAgentApp(App):
                 "Use that error information to adjust your strategy, change your search query, or try a different approach."
             )}
         ]
-
         self.chat_history_text = "[bold green]Agent Initialized.[/bold green] Ready for research.\n"
 
     def compose(self) -> ComposeResult:
@@ -317,11 +317,9 @@ class ResearchAgentApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        # 2. Grab the specific widgets and save them as attributes here!
         self.chat_view = self.query_one("#chat-panel", VerticalScroll)
         self.chat_static = self.query_one("#chat-text", Static)
         self.tool_log = self.query_one("#tool-panel", RichLog)
-
         self.tool_log.write("[bold yellow]Tool Activity Log[/bold yellow]\n")
         self.query_one(Input).focus()
 
@@ -329,18 +327,13 @@ class ResearchAgentApp(App):
         user_text = event.value.strip()
         if not user_text:
             return
-
         event.input.clear()
         self.chat_history_text += f"\n[bold cyan][You][/bold cyan] {escape(user_text)}\n"
         self.chat_static.update(Text.from_markup(self.chat_history_text))
         self.chat_view.scroll_end(animate=False)
-
         self.messages.append({"role": "user", "content": user_text})
         self.messages = trim_history(self.messages, MAX_HISTORY_TURNS)
-
         self.title = "ResearchBot (Thinking...)"
-
-        # Fire off the async worker
         self.run_worker(self._get_response(), exclusive=True)
 
     async def _get_response(self) -> None:
@@ -358,51 +351,36 @@ class ResearchAgentApp(App):
             redirect_handler=open_browser,
             callback_handler=wait_for_callback,
         )
-
         try:
             async with httpx.AsyncClient(auth=auth, follow_redirects=True, timeout=60) as http:
                 async with streamable_http_client(ALPHAXIV_MCP_URL, http_client=http) as (read, write, _):
                     async with ClientSession(read, write) as session:
                         await session.initialize()
-
                         mcp_tools = await session.list_tools()
                         mcp_openai_tools = [{"type": "function", "function": {
                             "name": t.name, "description": t.description, "parameters": t.inputSchema}} for t in mcp_tools.tools]
                         all_tools = LOCAL_TOOLS + mcp_openai_tools
-
                         for iteration in range(10):
-                            # 1. Use async_client, await the call, and enable stream
                             response = await async_client.chat.completions.create(
                                 model=MODEL,
                                 messages=self.messages,
                                 tools=all_tools,
                                 stream=True,
                             )
-
                             collected_content = ""
                             tool_calls_dict = {}
-
-                            # 1. Add a flag to track if we've printed the nametag yet
                             started_typing = False
-
-                            # 2. Async iterate through the stream chunks
                             async for chunk in response:
                                 delta = chunk.choices[0].delta
-
-                                # Handle Text Streaming
                                 if delta.content:
-                                    # 3. Only print the tag if this is the first text chunk!
                                     if not started_typing:
                                         self.chat_history_text += "\n[bold green][Agent][/bold green] "
                                         started_typing = True
-
                                     collected_content += delta.content
                                     # Update UI instantly and scroll down (escaping the chunks!)
                                     self.chat_static.update(Text.from_markup(
                                         self.chat_history_text + escape(collected_content)))
                                     self.chat_view.scroll_end(animate=False)
-
-                                # Handle Tool Calling (OpenAI sends args in chunks)
                                 if delta.tool_calls:
                                     for tc_chunk in delta.tool_calls:
                                         idx = tc_chunk.index
@@ -414,43 +392,28 @@ class ResearchAgentApp(App):
                                             }
                                         if tc_chunk.function.arguments:
                                             tool_calls_dict[idx]["function"]["arguments"] += tc_chunk.function.arguments
-
-                            # Commit the fully streamed text to our history state
                             if collected_content:
                                 self.chat_history_text += escape(
                                     collected_content) + "\n"
-
-                            # 4. Construct the final message dictionary
                             message_dict = {"role": "assistant"}
                             if collected_content:
                                 message_dict["content"] = collected_content
                             if tool_calls_dict:
                                 message_dict["tool_calls"] = list(
                                     tool_calls_dict.values())
-
                             self.messages.append(message_dict)
-
-                            # If no tools were called, the turn is over.
                             if "tool_calls" not in message_dict:
                                 self.title = "ResearchBot: TUI Edition"
                                 return
-
-                            # ... (Keep your existing tool execution logic directly below here) ...
-
-                            # 5. Process accumulated tool calls
                             for tool_call in message_dict["tool_calls"]:
                                 func_name = tool_call["function"]["name"]
                                 args_string = tool_call["function"]["arguments"]
-
                                 try:
                                     args = json.loads(args_string)
                                 except json.JSONDecodeError:
-                                    args = {}  # Failsafe for truncated streams
-
+                                    args = {}
                                 self.tool_log.write(
                                     f"→ [magenta]Invoking: {func_name}[/magenta]")
-
-                                # --- Your existing tool execution logic remains exactly the same! ---
                                 if func_name == "web_search":
                                     result = web_search(
                                         query=args.get("query"))
@@ -468,20 +431,16 @@ class ResearchAgentApp(App):
                                         result = mcp_result.content[0].text if mcp_result.content else "Success."
                                     except Exception as e:
                                         result = f"MCP Error: {e}"
-
                                 self.tool_log.write(
                                     f"  [dim]↳ Completed ({len(str(result))} chars)[/dim]")
-
                                 self.messages.append({
                                     "role": "tool",
                                     "tool_call_id": tool_call["id"],
                                     "content": str(result)
                                 })
-
                         self.chat_log.write(
                             "\n[bold red][System][/bold red] Agent hit the maximum iteration limit.")
                         self.title = "ResearchBot: TUI Edition"
-
         except Exception as e:
             self.chat_log.write(
                 f"\n[bold red][Error][/bold red] Connection or Execution failed: {str(e)}")
@@ -493,23 +452,16 @@ class ResearchAgentApp(App):
 
     def action_clear_display(self) -> None:
         """Clear the visible logs without touching conversation history (Ctrl+L)."""
-        # Reset the string state and update the Static widget
         self.chat_history_text = "[dim]Display cleared. Conversation history remains intact.[/dim]\n"
         self.chat_static.update(Text.from_markup(self.chat_history_text))
-
-        # Tool log is still a RichLog, so this stays the same
         self.tool_log.clear()
         self.tool_log.write("[bold yellow]Tool Activity Log[/bold yellow]\n")
 
     def action_clear_history(self) -> None:
         """Reset conversation history and clear the display (Ctrl+K)."""
-        self.messages = [self.messages[0]]  # Keep only the system prompt
-
-        # Reset the string state and update the Static widget
+        self.messages = [self.messages[0]]
         self.chat_history_text = "[bold yellow]History and Display cleared. Fresh start.[/bold yellow]\n"
         self.chat_static.update(Text.from_markup(self.chat_history_text))
-
-        # Tool log stays the same
         self.tool_log.clear()
         self.tool_log.write("[bold yellow]Tool Activity Log[/bold yellow]\n")
 
