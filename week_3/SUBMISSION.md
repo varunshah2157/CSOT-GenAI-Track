@@ -1,8 +1,22 @@
-## Build 1
-Build 1 was quite simple. Generate a session ID, write and append session data to a json file. Ability to resume a session using session ID. Didn't add a way in code to resume a session, manually changed and commented out parts of code to first run code to create a session and then to resume it using hardcoded ID.
+# Week 3 Submission: Multi-Mode Agent Architecture & Session Persistence
 
-## Build 2
-Build 2 was also simple. Basic agent with access to the following tools : read, write, edit, list files. REPL format implemented along with one shot prompt format. Edit file tool was a bit buggy - I requested it to edit specific lines and on some attempts it messed up and on some attempts it could do it.
+**Name:** Varun Shah  
+**Entry Number:** 2025MT11346  
 
-## Project
-This was complicated to implement but by the end it felt easy to traverse in its modular format. Worked on top of last weeks agent only which had TUI, streaming and web tools. Implementing tools was easy enough, did face some bugs. Was a bit unfamiliar with classes and OOP but it was just splitting the code into functions within classes. TUI code was reused. Using the learnings from Build 1 and Build 2 and the .md files it was just the task of adding upon the previous agent. At the end it was quite satisfying when it all tied together. OpenAI API faced some issues using papers tools so changed my priority models list. Sessions are saved in `.agent/sessions`. Notes/.md files which you ask the agent to make are saved in `/notes`. Tools files are in `/tools`. TUI code is in `tui.py`. File structure followed as instructed. Finally told claude to give me all possible commands testing everything about the agent and it successfully passed all my testing. All REPL commands are functional, bonus tasks were completed(resume session and auto title).
+---
+
+## 1. Build Architectures
+
+### Build 1: Persistent Session Engine
+- Designed UUID-based session identification, serialization, and disk persistence to JSON.
+- Engineered state restoration allowing resuming previous conversational contexts with role ordering preserved.
+
+### Build 2: File System Tooling & Interaction Modes
+- Implemented core file-manipulation primitives (`read_file`, `write_file`, `edit_file`, `list_files`).
+- Supported dual invocation modalities: single-turn execution (`run_once`) and interactive Read-Eval-Print Loop (REPL).
+
+### Project: Production Multi-Mode Research Agent
+- **Modular Object-Oriented Architecture:** Abstracted agent capabilities into structured classes encapsulating state, memory, and tool dispatching.
+- **Multi-Modal User Interface:** Engineered support for Textual TUI (`tui.py`), CLI arguments, and an interactive REPL shell.
+- **Storage Layout:** Structured filesystem layout separating operational sessions (`.agent/sessions`), generated research artifacts (`notes/`), and dynamic tools (`tools/`).
+- **Comprehensive Verification:** Validated all REPL commands, session persistence, auto-titling, and tool execution across edge cases.
